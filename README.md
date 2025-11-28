@@ -117,29 +117,13 @@ async-workflow-orchestrator/
 │   ├── test_worker_manager.py
 │   └── test_api.py
 ├── main.py                   # Application entry point
-├── example.py                # Demonstration script
+├── demo.py                   # Demonstration script
 ├── requirements.txt
 ├── .env.example
 ├── .gitignore
 ├── pytest.ini
-└── README.md
-```
-│   │   ├── orchestrator.py  # State machine orchestrator
-│   │   └── worker_manager.py # Thread pool worker manager
-│   └── db/
-│       ├── __init__.py
-│       ├── models.py         # SQLAlchemy models
-│       └── database.py       # Database session management
-├── tests/
-│   ├── __init__.py
-│   ├── test_orchestrator.py
-│   ├── test_worker_manager.py
-│   └── test_api.py
-├── main.py                   # Application entry point
-├── requirements.txt
-├── .env.example
-├── .gitignore
-├── pytest.ini
+├── QUICKSTART.md
+├── PROJECT_SUMMARY.md
 └── README.md
 ```
 
@@ -214,7 +198,7 @@ The API will be available at:
 **Run the demonstration:**
 ```bash
 # In another terminal (while server is running)
-python example.py
+python demo.py
 ```
 
 This will demonstrate automatic workflow execution through all states.
@@ -724,7 +708,7 @@ if status['status'] == 'FAILED':
 
 ```bash
 # Run the comprehensive example
-python example.py
+python demo.py
 ```
 
 Output:

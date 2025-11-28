@@ -33,7 +33,7 @@
 
 In a new terminal:
 ```bash
-python example.py
+python demo.py
 ```
 
 This will demonstrate automatic workflow execution with full output.
@@ -71,7 +71,7 @@ Open http://localhost:8000/docs in your browser
 ## Next Steps
 
 - Read the full [README.md](README.md) for detailed documentation
-- Check [example.py](example.py) for usage patterns
+- Check [demo.py](demo.py) for usage patterns
 - Explore the API at http://localhost:8000/docs
 - Run tests: `pytest`
 
