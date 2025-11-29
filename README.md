@@ -473,47 +473,48 @@ elif task_type == "custom_task":
 
 ### Sequence Diagram
 
-```
-Client          API            Orchestrator        Worker Thread      Database
-  |              |                   |                    |              |
-  |--POST /workflow/start----------->|                    |              |
-  |              |                   |                    |              |
-  |              |--create workflow---------------------->|--INSERT----->|
-  |              |<--workflow_id-----|                    |              |
-  |<--201 Created-|                  |                    |              |
-  |              |                   |                    |              |
-  |              |--execute_automatic()                   |              |
-  |              |                   |                    |              |
-  |              |                   |--submit_task(INIT)------------->  |
-  |              |                   |                    |--execute---> |
-  |              |                   |                    |<--result---- |
-  |              |                   |<--result-----------|              |
-  |              |                   |                    |              |
-  |              |                   |--trigger: prepare-->              |
-  |              |                   |--log_transition------------------->
-  |              |                   |                    |              |
-  |              |                   |--submit_task(PREPARE)-----------> |
-  |              |                   |                    |--execute---> |
-  |              |                   |<--result-----------|              |
-  |              |                   |                    |              |
-  |              |                   |--trigger: execute-->              |
-  |              |                   |--log_transition------------------->
-  |              |                   |                    |              |
-  |              |                   |--submit_task(EXECUTE)-----------> |
-  |              |                   |                    |--execute---> |
-  |              |                   |<--result-----------|              |
-  |              |                   |                    |              |
-  |              |                   |--trigger: validate->              |
-  |              |                   |--log_transition------------------->
-  |              |                   |                    |              |
-  |              |                   |--submit_task(VALIDATE)---------->  |
-  |              |                   |                    |--execute---> |
-  |              |                   |<--result-----------|              |
-  |              |                   |                    |              |
-  |              |                   |--trigger: complete->              |
-  |              |                   |--log_transition------------------->
-  |              |                   |                    |              |
-  |              |<--workflow COMPLETE                    |              |
+```mermaid
+sequenceDiagram
+    autonumber
+    participant Client
+    participant API
+    participant Orchestrator
+    participant Worker as Worker Thread
+    participant DB as Database
+
+    Client->>API: POST /workflow/start
+    activate API
+    API->>DB: Create Workflow (INIT)
+    activate DB
+    DB-->>API: workflow_id
+    deactivate DB
+    API-->>Client: 201 Created
+    deactivate API
+
+    Note right of API: Background Task Started
+
+    API->>Orchestrator: execute_automatic()
+    activate Orchestrator
+
+    loop For each state [INIT, PREPARE, EXECUTE, VALIDATE]
+        Orchestrator->>Worker: submit_task(current_state)
+        activate Worker
+        Worker->>Worker: Execute Task Logic
+        Worker-->>Orchestrator: Task Result
+        deactivate Worker
+
+        Orchestrator->>Orchestrator: Determine Next Trigger
+        Orchestrator->>DB: Log Transition & Update State
+        activate DB
+        DB-->>Orchestrator: Success
+        deactivate DB
+    end
+
+    Orchestrator->>DB: Log Final Transition (COMPLETE)
+    activate DB
+    DB-->>Orchestrator: Success
+    deactivate DB
+    deactivate Orchestrator
 ```
 
 ## 🔍 Workflow States
@@ -522,32 +523,27 @@ Workflows transition through the following states with specific purposes:
 
 ### State Transition Rules
 
-```
-INIT
-  ├─[prepare]──> PREPARE
-  ├─[fail]─────> FAILED
-  └─[cancel]───> CANCELLED
+```mermaid
+stateDiagram-v2
+    direction LR
 
-PREPARE
-  ├─[execute]──> EXECUTE
-  ├─[fail]─────> FAILED
-  └─[cancel]───> CANCELLED
+    state "In Progress" as Running {
+        direction LR
+        INIT --> PREPARE: prepare
+        PREPARE --> EXECUTE: execute
+        EXECUTE --> VALIDATE: validate
+    }
 
-EXECUTE
-  ├─[validate]─> VALIDATE
-  ├─[fail]─────> FAILED
-  └─[cancel]───> CANCELLED
-
-VALIDATE
-  ├─[complete]─> COMPLETE
-  ├─[fail]─────> FAILED
-  └─[cancel]───> CANCELLED
-
-FAILED
-  └─[retry]────> INIT
-
-COMPLETE (terminal state)
-CANCELLED (terminal state)
+    [*] --> INIT
+    VALIDATE --> COMPLETE: complete
+    
+    Running --> FAILED: fail
+    Running --> CANCELLED: cancel
+    
+    FAILED --> INIT: retry
+    
+    COMPLETE --> [*]
+    CANCELLED --> [*]
 ```
 
 State transitions are logged in the `workflow_transitions` table with full metadata.
