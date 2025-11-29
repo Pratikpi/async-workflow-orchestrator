@@ -10,12 +10,14 @@ from src.core import WorkerManager
 
 
 @pytest.fixture
-def db_engine():
+def db_engine(tmp_path):
     """Create a test database engine."""
+    # Use a file-based database for multi-threaded tests to avoid
+    # sqlite3 threading issues with shared in-memory connections
+    db_path = tmp_path / "test_worker.db"
     engine = create_engine(
-        "sqlite:///:memory:",
-        connect_args={"check_same_thread": False},
-        poolclass=StaticPool
+        f"sqlite:///{db_path}",
+        connect_args={"timeout": 30}
     )
     Base.metadata.create_all(engine)
     return engine
