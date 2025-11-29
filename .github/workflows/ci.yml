@@ -1,0 +1,94 @@
+# This workflow will install Python dependencies, run tests and lint with a single version of Python
+# For more information see: https://docs.github.com/en/actions/automating-builds-and-tests/building-and-testing-python
+
+name: Python application
+
+on:
+  push:
+    branches: [ "main" ]
+  pull_request:
+    branches: [ "main" ]
+
+# Cancel in-progress runs on the same branch to save resources
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    name: Build and Test
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Set up Python 3.13
+      uses: actions/setup-python@v5
+      with:
+        python-version: "3.13"
+        cache: 'pip' # Cache pip dependencies
+        
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install flake8 pytest
+        if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
+        
+    - name: Lint with flake8
+      run: |
+        # stop the build if there are Python syntax errors or undefined names
+        flake8 . --count --select=E9,F63,F7,F82 --show-source --statistics
+        # exit-zero treats all errors as warnings. The GitHub editor is 127 chars wide
+        flake8 . --count --exit-zero --max-complexity=10 --max-line-length=127 --statistics
+        
+    - name: Test with pytest
+      run: |
+        pytest
+  
+  integration-test:
+    name: Integration Test
+    needs: build # Ensure this only runs if build/test passes
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Set up Python 3.13
+      uses: actions/setup-python@v5
+      with:
+        python-version: "3.13"
+        cache: 'pip'
+        
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        # Only install runtime dependencies for integration test
+        if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
+
+    - name: Run Application and Health Check
+      run: |
+        # Start the application in the background
+        python3 main.py &
+        APP_PID=$!
+        
+        # Wait for the application to start
+        echo "Waiting for application to start..."
+        sleep 10
+        
+        # Check health
+        echo "Checking health endpoint..."
+        if ! curl -f -v http://localhost:8000/health; then
+          echo "Health check failed!"
+          kill $APP_PID
+          exit 1
+        fi
+        
+        # Kill the application
+        kill $APP_PID
+      
+    
