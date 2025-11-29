@@ -36,74 +36,27 @@ class WorkflowOrchestrator:
         self.workflow_id = workflow_id
         self.db = db
         self.workflow = self._load_workflow()
-        
+
+        # Define transitions for the workflow lifecycle
+        # INIT → PREPARE → EXECUTE → VALIDATE → COMPLETE
+        self.transitions = [
+            {'trigger': 'prepare', 'source': 'INIT', 'dest': 'PREPARE', 'before': '_on_state_enter', 'after': '_log_transition'},
+            {'trigger': 'execute', 'source': 'PREPARE', 'dest': 'EXECUTE', 'before': '_on_state_enter', 'after': '_log_transition'},
+            {'trigger': 'validate', 'source': 'EXECUTE', 'dest': 'VALIDATE', 'before': '_on_state_enter', 'after': '_log_transition'},
+            {'trigger': 'complete', 'source': 'VALIDATE', 'dest': 'COMPLETE', 'before': '_on_complete', 'after': '_log_transition'},
+            {'trigger': 'fail', 'source': ['INIT', 'PREPARE', 'EXECUTE', 'VALIDATE'], 'dest': 'FAILED', 'before': '_on_fail', 'after': '_log_transition'},
+            {'trigger': 'cancel', 'source': ['INIT', 'PREPARE', 'EXECUTE', 'VALIDATE'], 'dest': 'CANCELLED', 'before': '_on_cancel', 'after': '_log_transition'},
+            {'trigger': 'retry', 'source': 'FAILED', 'dest': 'INIT'}
+        ]
+
         # Initialize state machine
         self.machine = Machine(
             model=self,
             states=WorkflowOrchestrator.states,
             initial=self.workflow.status.value,
+            transitions=self.transitions,
             auto_transitions=False,
             send_event=True,
-        )
-        
-        # Define transitions for the workflow lifecycle
-        # INIT → PREPARE → EXECUTE → VALIDATE → COMPLETE
-        self.machine.add_transition(
-            trigger='prepare',
-            source='INIT',
-            dest='PREPARE',
-            before='_on_state_enter',
-            after='_log_transition'
-        )
-        
-        self.machine.add_transition(
-            trigger='execute',
-            source='PREPARE',
-            dest='EXECUTE',
-            before='_on_state_enter',
-            after='_log_transition'
-        )
-        
-        self.machine.add_transition(
-            trigger='validate',
-            source='EXECUTE',
-            dest='VALIDATE',
-            before='_on_state_enter',
-            after='_log_transition'
-        )
-        
-        self.machine.add_transition(
-            trigger='complete',
-            source='VALIDATE',
-            dest='COMPLETE',
-            before='_on_complete',
-            after='_log_transition'
-        )
-        
-        # Error transitions from any state
-        self.machine.add_transition(
-            trigger='fail',
-            source=['INIT', 'PREPARE', 'EXECUTE', 'VALIDATE'],
-            dest='FAILED',
-            before='_on_fail',
-            after='_log_transition'
-        )
-        
-        self.machine.add_transition(
-            trigger='cancel',
-            source=['INIT', 'PREPARE', 'EXECUTE', 'VALIDATE'],
-            dest='CANCELLED',
-            before='_on_cancel',
-            after='_log_transition'
-        )
-        
-        # Retry transition (from FAILED back to INIT)
-        self.machine.add_transition(
-            trigger='retry',
-            source='FAILED',
-            dest='INIT',
-            before='_on_retry',
-            after='_log_transition'
         )
         
         self._event_queue = asyncio.Queue()
@@ -228,13 +181,10 @@ class WorkflowOrchestrator:
         Determine the next trigger based on current state.
         Returns the trigger name to advance to the next state.
         """
-        state_progression = {
-            'INIT': 'prepare',
-            'PREPARE': 'execute',
-            'EXECUTE': 'validate',
-            'VALIDATE': 'complete',
-        }
-        return state_progression.get(self.state)
+        for transition in self.transitions:
+            if transition['source'] == self.state:
+                return transition['trigger']
+        return None
     
     async def advance_to_next_state(self):
         """Advance workflow to the next state after task completion."""
@@ -307,7 +257,7 @@ class WorkflowOrchestrator:
                 await self.advance_to_next_state()
                 
                 # Small delay to allow state transition to complete
-                await asyncio.sleep(0.1)
+                await asyncio.sleep(2)
             
             # Stop event processor
             self._running = False
