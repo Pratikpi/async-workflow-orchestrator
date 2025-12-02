@@ -10,6 +10,7 @@ from sqlalchemy.orm import Session, sessionmaker
 
 from config import settings
 from src.db import Task, TaskStatus, SessionLocal as DefaultSessionLocal
+from src.db.dao.task_dao import TaskDAO
 
 
 logger = logging.getLogger(__name__)
@@ -171,15 +172,18 @@ class WorkerManager:
         Returns:
             Future object representing the task execution
         """
+        task_dao = TaskDAO(db)
+        
         # Load task from database
-        task = db.query(Task).filter(Task.id == task_id).first()
+        task = task_dao.get_by_id(task_id)
         if not task:
             raise ValueError(f"Task {task_id} not found")
         
         # Update task status to queued
-        task.status = TaskStatus.QUEUED
-        task.updated_at = datetime.now(timezone.utc)
-        db.commit()
+        task_dao.update(task_id, {
+            "status": TaskStatus.QUEUED,
+            "updated_at": datetime.now(timezone.utc)
+        })
         
         logger.info(f"Submitting task {task_id} ({task.name}) to worker pool")
         
@@ -201,19 +205,21 @@ class WorkerManager:
         """
         # Create new database session for this thread
         db = self.session_factory()
+        task_dao = TaskDAO(db)
         
         try:
             # Load task
-            task = db.query(Task).filter(Task.id == task_id).first()
+            task = task_dao.get_by_id(task_id)
             if not task:
                 logger.error(f"Task {task_id} not found in database")
                 return False
             
             # Update status to running
-            task.status = TaskStatus.RUNNING
-            task.started_at = datetime.now(timezone.utc)
-            task.updated_at = datetime.now(timezone.utc)
-            db.commit()
+            task_dao.update(task_id, {
+                "status": TaskStatus.RUNNING,
+                "started_at": datetime.now(timezone.utc),
+                "updated_at": datetime.now(timezone.utc)
+            })
             
             logger.info(f"Executing task {task_id} ({task.name}) in thread {threading.current_thread().name}")
             
@@ -221,11 +227,12 @@ class WorkerManager:
             result = self._run_task_logic(task)
             
             # Update task with result
-            task.status = TaskStatus.COMPLETED
-            task.completed_at = datetime.now(timezone.utc)
-            task.updated_at = datetime.now(timezone.utc)
-            task.result = result
-            db.commit()
+            task_dao.update(task_id, {
+                "status": TaskStatus.COMPLETED,
+                "completed_at": datetime.now(timezone.utc),
+                "updated_at": datetime.now(timezone.utc),
+                "result": result
+            })
             
             logger.info(f"Task {task_id} completed successfully")
             return True
@@ -234,13 +241,12 @@ class WorkerManager:
             logger.error(f"Task {task_id} failed: {e}")
             
             # Update task status to failed
-            task = db.query(Task).filter(Task.id == task_id).first()
-            if task:
-                task.status = TaskStatus.FAILED
-                task.completed_at = datetime.now(timezone.utc)
-                task.updated_at = datetime.now(timezone.utc)
-                task.error_message = str(e)
-                db.commit()
+            task_dao.update(task_id, {
+                "status": TaskStatus.FAILED,
+                "completed_at": datetime.now(timezone.utc),
+                "updated_at": datetime.now(timezone.utc),
+                "error_message": str(e)
+            })
             
             return False
             

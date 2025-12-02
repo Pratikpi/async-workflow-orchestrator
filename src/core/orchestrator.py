@@ -7,6 +7,8 @@ from transitions import Machine
 from sqlalchemy.orm import Session
 
 from src.db import Workflow, WorkflowTransition, WorkflowStatus
+from src.db.dao.workflow_dao import WorkflowDAO
+from src.db.dao.workflow_transition_dao import WorkflowTransitionDAO
 
 
 logger = logging.getLogger(__name__)
@@ -35,6 +37,8 @@ class WorkflowOrchestrator:
         """Initialize the orchestrator for a specific workflow."""
         self.workflow_id = workflow_id
         self.db = db
+        self.workflow_dao = WorkflowDAO(db)
+        self.transition_dao = WorkflowTransitionDAO(db)
         self.workflow = self._load_workflow()
 
         # Define transitions for the workflow lifecycle
@@ -65,7 +69,7 @@ class WorkflowOrchestrator:
     
     def _load_workflow(self) -> Workflow:
         """Load workflow from database."""
-        workflow = self.db.query(Workflow).filter(Workflow.id == self.workflow_id).first()
+        workflow = self.workflow_dao.get_by_id(self.workflow_id)
         if not workflow:
             raise ValueError(f"Workflow {self.workflow_id} not found")
         return workflow
@@ -79,13 +83,17 @@ class WorkflowOrchestrator:
             trigger=event.event.name,
             metadata={"timestamp": datetime.now(timezone.utc).isoformat()}
         )
-        self.db.add(transition)
+        self.transition_dao.create(transition)
         
         # Update workflow status and current_state
-        self.workflow.status = WorkflowStatus(event.transition.dest)
-        self.workflow.current_state = event.transition.dest
-        self.workflow.updated_at = datetime.now(timezone.utc)
-        self.db.commit()
+        self.workflow_dao.update(self.workflow_id, {
+            "status": WorkflowStatus(event.transition.dest),
+            "current_state": event.transition.dest,
+            "updated_at": datetime.now(timezone.utc)
+        })
+        
+        # Refresh local workflow object
+        self.workflow = self.workflow_dao.get_by_id(self.workflow_id)
         
         logger.info(
             f"Workflow {self.workflow_id}: {event.transition.source} → "
@@ -97,30 +105,46 @@ class WorkflowOrchestrator:
         logger.info(f"Entering state {event.transition.dest} for workflow {self.workflow_id}")
         if self.workflow.started_at is None:
             self.workflow.started_at = datetime.now(timezone.utc)
+            self.workflow_dao.update(self.workflow_id, {"started_at": self.workflow.started_at})
     
     def _on_complete(self, event):
         """Handle workflow completion."""
-        self.workflow.completed_at = datetime.now(timezone.utc)
+        completed_at = datetime.now(timezone.utc)
+        self.workflow_dao.update(self.workflow_id, {"completed_at": completed_at})
+        self.workflow.completed_at = completed_at
         logger.info(f"Completed workflow {self.workflow_id}")
     
     def _on_fail(self, event):
         """Handle workflow failure."""
-        self.workflow.completed_at = datetime.now(timezone.utc)
-        error_msg = event.kwargs.get('error', 'Unknown error')
-        self.workflow.error_message = str(error_msg)
+        completed_at = datetime.now(timezone.utc)
+        error_msg = str(event.kwargs.get('error', 'Unknown error'))
+        
+        self.workflow_dao.update(self.workflow_id, {
+            "completed_at": completed_at,
+            "error_message": error_msg
+        })
+        
+        self.workflow.completed_at = completed_at
+        self.workflow.error_message = error_msg
         logger.error(f"Failed workflow {self.workflow_id}: {error_msg}")
     
     def _on_cancel(self, event):
         """Handle workflow cancellation."""
-        self.workflow.completed_at = datetime.now(timezone.utc)
+        completed_at = datetime.now(timezone.utc)
+        self.workflow_dao.update(self.workflow_id, {"completed_at": completed_at})
+        self.workflow.completed_at = completed_at
         logger.info(f"Cancelled workflow {self.workflow_id}")
     
     def _on_retry(self, event):
         """Handle workflow retry."""
-        self.workflow.retries += 1
-        self.workflow.error_message = None
-        self.workflow.completed_at = None
-        self.workflow.started_at = None
+        self.workflow_dao.update(self.workflow_id, {
+            "retries": self.workflow.retries + 1,
+            "error_message": None,
+            "completed_at": None,
+            "started_at": None
+        })
+        # Refresh local state
+        self.workflow = self.workflow_dao.get_by_id(self.workflow_id)
         logger.info(f"Retrying workflow {self.workflow_id} (attempt {self.workflow.retries})")
     
     async def emit_event(self, event_name: str, **kwargs):
@@ -341,12 +365,11 @@ class WorkflowOrchestrator:
     
     def get_status(self) -> Dict[str, Any]:
         """Get current workflow status."""
-        self.db.refresh(self.workflow)
+        # Refresh workflow data
+        self.workflow = self.workflow_dao.get_by_id(self.workflow_id)
         
         # Get all transitions for history
-        transitions = self.db.query(WorkflowTransition).filter(
-            WorkflowTransition.workflow_id == self.workflow_id
-        ).order_by(WorkflowTransition.created_at).all()
+        transitions = self.transition_dao.get_by_workflow_id(self.workflow_id)
         
         return {
             "workflow_id": self.workflow_id,

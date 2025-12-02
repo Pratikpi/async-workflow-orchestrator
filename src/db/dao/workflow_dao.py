@@ -50,3 +50,10 @@ class WorkflowDAO:
         self.db.delete(workflow)
         self.db.commit()
         return True
+
+    def count(self, status: Optional[WorkflowStatus] = None) -> int:
+        """Count workflows, optionally filtered by status."""
+        query = self.db.query(Workflow)
+        if status:
+            query = query.filter(Workflow.status == status)
+        return query.count()
