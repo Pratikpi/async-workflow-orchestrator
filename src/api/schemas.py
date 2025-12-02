@@ -10,6 +10,7 @@ class WorkflowCreate(BaseModel):
     name: str = Field(..., min_length=1, max_length=255)
     description: Optional[str] = None
     config: Optional[Any] = None
+    auto_start: bool = True
 
 
 class WorkflowUpdate(BaseModel):

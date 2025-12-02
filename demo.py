@@ -92,12 +92,13 @@ def check_server_health() -> bool:
         return False
 
 
-def start_workflow(name: str, description: str, config: Optional[Dict[str, Any]] = None) -> Optional[int]:
+def start_workflow(name: str, description: str, config: Optional[Dict[str, Any]] = None, auto_start: bool = True) -> Optional[int]:
     """Start a new workflow."""
     payload = {
         "name": name,
         "description": description,
-        "config": config or {"priority": "high", "timeout": 300}
+        "config": config or {"priority": "high", "timeout": 300},
+        "auto_start": auto_start
     }
     
     try:
@@ -313,7 +314,8 @@ def demo_manual_workflow():
     
     workflow_id = start_workflow(
         "Manual Processing Workflow",
-        "Demonstrates manual control over workflow progression"
+        "Demonstrates manual control over workflow progression",
+        auto_start=False
     )
     
     if workflow_id:
@@ -375,12 +377,52 @@ def demo_concurrent_workflows():
     return workflow_ids
 
 
+def inject_failed_workflow() -> Optional[int]:
+    """Helper to create a workflow that is guaranteed to fail."""
+    print_info("Injecting a failed workflow...")
+    return start_workflow(
+        "Flaky Workflow",
+        "Demonstrates retry mechanism by simulating failure on first attempt",
+        config={
+            "priority": "high", 
+            "simulate_failure": True,
+            "fail_until_retry": 1
+        }
+    )
+
+
 def demo_retry_mechanism():
     """Demo 4: Workflow retry after failure."""
     print_section("Demo 4: Retry Mechanism", 'HEADER')
-    print_info("This demo would show retry behavior for failed workflows")
-    print_warning("Note: The current implementation auto-succeeds, so manual failure injection needed")
-    print_info("To test: Modify a workflow to fail, then use the retry endpoint")
+    print_info("Starting a workflow configured to fail initially, then succeeding on retry")
+    
+    # Start workflow with failure simulation
+    workflow_id = inject_failed_workflow()
+    
+    if workflow_id:
+        time.sleep(1)
+        print_info("Monitoring workflow (expecting failure)...")
+        
+        # Monitor until failure
+        status = monitor_workflow(workflow_id, max_wait=15)
+        
+        if status and status['status'] == 'FAILED':
+            print("\n")
+            print_warning(f"Workflow failed as expected: {status.get('error_message')}")
+            
+            time.sleep(1)
+            print_info("Initiating retry...")
+            
+            # Retry workflow
+            if retry_workflow(workflow_id):
+                time.sleep(1)
+                print_info("Monitoring workflow after retry (expecting success)...")
+                monitor_workflow(workflow_id, max_wait=15)
+                
+                print("\n")
+                print_workflow_details(workflow_id)
+        else:
+            print_warning("Workflow did not fail as expected!")
 
 
 def demo_system_monitoring():
@@ -399,11 +441,11 @@ def interactive_menu():
     while True:
         print(f"\n{COLORS['BOLD']}Available Commands:{COLORS['END']}")
         print("  1. Start a new workflow")
-        print("  2. Check workflow status")
-        print("  3. List all workflows")
-        print("  4. View system statistics")
-        print("  5. Trigger next step (manual)")
-        print("  6. Cancel a workflow")
+        print("  2. Trigger next step")
+        print("  3. Cancel a workflow")
+        print("  4. Check workflow status")
+        print("  5. List all workflows")
+        print("  6. View system statistics")
         print("  7. Run all demos")
         print("  0. Exit")
         
@@ -416,20 +458,22 @@ def interactive_menu():
             elif choice == '1':
                 name = input("Workflow name: ").strip()
                 desc = input("Description: ").strip()
-                start_workflow(name, desc)
+                auto_start_input = input("Auto-start workflow? (y/N): ").strip().lower()
+                auto_start = auto_start_input == 'y' or auto_start_input == 'yes'
+                start_workflow(name, desc, auto_start=auto_start)
             elif choice == '2':
                 wf_id = int(input("Workflow ID: ").strip())
-                print_workflow_details(wf_id)
-            elif choice == '3':
-                list_workflows()
-            elif choice == '4':
-                get_system_stats()
-            elif choice == '5':
-                wf_id = int(input("Workflow ID: ").strip())
                 trigger_next_step(wf_id)
-            elif choice == '6':
+            elif choice == '3':
                 wf_id = int(input("Workflow ID: ").strip())
                 cancel_workflow(wf_id)
+            elif choice == '4':
+                wf_id = int(input("Workflow ID: ").strip())
+                print_workflow_details(wf_id)
+            elif choice == '5':
+                list_workflows()
+            elif choice == '6':
+                get_system_stats()
             elif choice == '7':
                 run_all_demos()
             else:

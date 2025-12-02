@@ -50,7 +50,7 @@ class WorkflowOrchestrator:
             {'trigger': 'complete', 'source': 'VALIDATE', 'dest': 'COMPLETE', 'before': '_on_complete', 'after': '_log_transition'},
             {'trigger': 'fail', 'source': ['INIT', 'PREPARE', 'EXECUTE', 'VALIDATE'], 'dest': 'FAILED', 'before': '_on_fail', 'after': '_log_transition'},
             {'trigger': 'cancel', 'source': ['INIT', 'PREPARE', 'EXECUTE', 'VALIDATE'], 'dest': 'CANCELLED', 'before': '_on_cancel', 'after': '_log_transition'},
-            {'trigger': 'retry', 'source': 'FAILED', 'dest': 'INIT'}
+            {'trigger': 'retry', 'source': 'FAILED', 'dest': 'INIT', 'before': '_on_retry', 'after': '_log_transition'}
         ]
 
         # Initialize state machine
@@ -198,7 +198,13 @@ class WorkflowOrchestrator:
                 continue
             except Exception as e:
                 logger.error(f"Error processing event: {e}")
-                await self.emit_event('fail', error=str(e))
+                # Only emit fail event if we are not already in FAILED state
+                # and if the error didn't occur while trying to process a 'fail' event
+                if self.state != 'FAILED' and event_name != 'fail':
+                    await self.emit_event('fail', error=str(e))
+                else:
+                    # If we are already failed or failed to process 'fail', stop running
+                    self._running = False
     
     def get_next_trigger(self) -> Optional[str]:
         """
@@ -252,7 +258,9 @@ class WorkflowOrchestrator:
                 task_config = {
                     'workflow_id': self.workflow_id,
                     'state': state,
-                    'task_type': task_type
+                    'task_type': task_type,
+                    'workflow_config': self.workflow.config or {},
+                    'retries': self.workflow.retries
                 }
                 
                 # Execute task in thread pool
@@ -323,7 +331,9 @@ class WorkflowOrchestrator:
             task_config = {
                 'workflow_id': self.workflow_id,
                 'state': current_state,
-                'task_type': task_type
+                'task_type': task_type,
+                'workflow_config': self.workflow.config or {},
+                'retries': self.workflow.retries
             }
             
             # Execute task in thread pool

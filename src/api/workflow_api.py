@@ -40,9 +40,10 @@ async def start_workflow(
     
     logger.info(f"Created workflow {db_workflow.id}: {db_workflow.name} in INIT state")
     
-    # Execute workflow in background
-    from src.api.execution import execute_workflow_background
-    background_tasks.add_task(execute_workflow_background, db_workflow.id)
+    # Execute workflow in background if auto_start is True
+    if workflow.auto_start:
+        from src.api.execution import execute_workflow_background
+        background_tasks.add_task(execute_workflow_background, db_workflow.id)
     
     return {
         "message": "Workflow started",

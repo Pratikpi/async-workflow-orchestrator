@@ -96,6 +96,16 @@ class WorkerManager:
         """
         logger.debug(f"Running workflow task type: {task_type} with config: {config}")
         
+        # Check for failure simulation
+        workflow_config = config.get("workflow_config", {})
+        if workflow_config.get("simulate_failure", False):
+            retries = config.get("retries", 0)
+            fail_until_retry = workflow_config.get("fail_until_retry", 1)
+            
+            if retries < fail_until_retry:
+                logger.warning(f"Simulating failure for task {task_type} (retry {retries}/{fail_until_retry})")
+                raise Exception(f"Simulated failure for demo (retry {retries})")
+
         # Task implementations for each workflow state
         if task_type == "initialize":
             # INIT state: Set up initial resources
