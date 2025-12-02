@@ -92,3 +92,21 @@ class TransitionResponse(BaseModel):
     created_at: datetime
     
     model_config = ConfigDict(from_attributes=True)
+
+
+class WorkflowStatusDetail(BaseModel):
+    """Schema for detailed workflow status including history and results."""
+    workflow_id: int
+    name: str
+    description: Optional[str]
+    status: str
+    current_state: str
+    retries: int
+    started_at: Optional[datetime]
+    completed_at: Optional[datetime]
+    error_message: Optional[str]
+    next_trigger: Optional[str]
+    transitions: List[TransitionResponse]
+    task_results: Dict[str, Any]
+    
+    model_config = ConfigDict(from_attributes=True)

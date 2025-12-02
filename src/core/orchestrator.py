@@ -388,18 +388,10 @@ class WorkflowOrchestrator:
             "status": self.workflow.status.value,
             "current_state": self.workflow.current_state,
             "retries": self.workflow.retries,
-            "started_at": self.workflow.started_at.isoformat() if self.workflow.started_at else None,
-            "completed_at": self.workflow.completed_at.isoformat() if self.workflow.completed_at else None,
+            "started_at": self.workflow.started_at,
+            "completed_at": self.workflow.completed_at,
             "error_message": self.workflow.error_message,
             "next_trigger": self.get_next_trigger(),
-            "transitions": [
-                {
-                    "from_state": t.from_state,
-                    "to_state": t.to_state,
-                    "trigger": t.trigger,
-                    "timestamp": t.created_at.isoformat()
-                }
-                for t in transitions
-            ],
+            "transitions": transitions,
             "task_results": self._task_results
         }

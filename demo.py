@@ -190,7 +190,7 @@ def print_workflow_details(workflow_id: int):
         print(f"\n{COLORS['BOLD']}State Transition History:{COLORS['END']}")
         for i, transition in enumerate(status['transitions'], 1):
             print(f"  {i}. {transition['from_state']} → {transition['to_state']} "
-                  f"(trigger: {transition['trigger']}) at {transition['timestamp']}")
+                  f"(trigger: {transition['trigger']}) at {transition['created_at']}")
     
     # Print task results
     if status.get('task_results'):

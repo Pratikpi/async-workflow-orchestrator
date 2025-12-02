@@ -5,7 +5,7 @@ from fastapi import APIRouter, Depends, HTTPException, status, BackgroundTasks
 from sqlalchemy.orm import Session
 
 from src.db import get_db, Workflow, WorkflowStatus, WorkflowTransition
-from src.api.schemas import WorkflowCreate, WorkflowResponse
+from src.api.schemas import WorkflowCreate, WorkflowResponse, WorkflowStatusDetail
 from src.db.dao.workflow_dao import WorkflowDAO
 from src.db.dao.workflow_transition_dao import WorkflowTransitionDAO
 from src.api.dependencies import get_workflow_dao, get_workflow_transition_dao
@@ -54,7 +54,7 @@ async def start_workflow(
     }
 
 
-@router.get("/{workflow_id}", response_model=dict)
+@router.get("/{workflow_id}", response_model=WorkflowStatusDetail)
 def get_workflow_state(
     workflow_id: int,
     workflow_dao: WorkflowDAO = Depends(get_workflow_dao),
@@ -74,9 +74,6 @@ def get_workflow_state(
             detail=f"Workflow {workflow_id} not found"
         )
     
-    # Get all transitions for history
-    transitions = transition_dao.get_by_workflow_id(workflow_id)
-    
     # Get status from orchestrator
     from src.core import WorkflowOrchestrator
     try:
@@ -84,6 +81,8 @@ def get_workflow_state(
         status_info = orchestrator.get_status()
     except Exception as e:
         logger.error(f"Error getting orchestrator status: {e}")
+        # Fallback to DB data if orchestrator fails
+        transitions = transition_dao.get_by_workflow_id(workflow_id)
         status_info = {
             "workflow_id": workflow_id,
             "name": workflow.name,
@@ -91,18 +90,12 @@ def get_workflow_state(
             "status": workflow.status.value,
             "current_state": workflow.current_state,
             "retries": workflow.retries,
-            "started_at": workflow.started_at.isoformat() if workflow.started_at else None,
-            "completed_at": workflow.completed_at.isoformat() if workflow.completed_at else None,
+            "started_at": workflow.started_at,
+            "completed_at": workflow.completed_at,
             "error_message": workflow.error_message,
-            "transitions": [
-                {
-                    "from_state": t.from_state,
-                    "to_state": t.to_state,
-                    "trigger": t.trigger,
-                    "timestamp": t.created_at.isoformat()
-                }
-                for t in transitions
-            ]
+            "next_trigger": None,
+            "transitions": transitions,
+            "task_results": {}
         }
     
     return status_info
