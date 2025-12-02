@@ -6,6 +6,9 @@ from sqlalchemy.orm import Session
 
 from src.db import get_db, Workflow, WorkflowStatus, WorkflowTransition
 from src.api.schemas import WorkflowCreate, WorkflowResponse
+from src.db.dao.workflow_dao import WorkflowDAO
+from src.db.dao.workflow_transition_dao import WorkflowTransitionDAO
+from src.api.dependencies import get_workflow_dao, get_workflow_transition_dao
 
 
 logger = logging.getLogger(__name__)
@@ -16,7 +19,7 @@ router = APIRouter(prefix="/workflow", tags=["workflow"])
 async def start_workflow(
     workflow: WorkflowCreate,
     background_tasks: BackgroundTasks,
-    db: Session = Depends(get_db)
+    workflow_dao: WorkflowDAO = Depends(get_workflow_dao)
 ):
     """
     Start a new workflow.
@@ -33,9 +36,7 @@ async def start_workflow(
         current_state="INIT",
         retries=0
     )
-    db.add(db_workflow)
-    db.commit()
-    db.refresh(db_workflow)
+    db_workflow = workflow_dao.create(db_workflow)
     
     logger.info(f"Created workflow {db_workflow.id}: {db_workflow.name} in INIT state")
     
@@ -53,14 +54,19 @@ async def start_workflow(
 
 
 @router.get("/{workflow_id}", response_model=dict)
-def get_workflow_state(workflow_id: int, db: Session = Depends(get_db)):
+def get_workflow_state(
+    workflow_id: int,
+    workflow_dao: WorkflowDAO = Depends(get_workflow_dao),
+    transition_dao: WorkflowTransitionDAO = Depends(get_workflow_transition_dao),
+    db: Session = Depends(get_db)
+):
     """
     Get current workflow state and full history.
     
     GET /workflow/{id}
     """
     # Verify workflow exists
-    workflow = db.query(Workflow).filter(Workflow.id == workflow_id).first()
+    workflow = workflow_dao.get_by_id(workflow_id)
     if not workflow:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
@@ -68,9 +74,7 @@ def get_workflow_state(workflow_id: int, db: Session = Depends(get_db)):
         )
     
     # Get all transitions for history
-    transitions = db.query(WorkflowTransition).filter(
-        WorkflowTransition.workflow_id == workflow_id
-    ).order_by(WorkflowTransition.created_at).all()
+    transitions = transition_dao.get_by_workflow_id(workflow_id)
     
     # Get status from orchestrator
     from src.core import WorkflowOrchestrator
@@ -103,10 +107,11 @@ def get_workflow_state(workflow_id: int, db: Session = Depends(get_db)):
 
 
 @router.post("/{workflow_id}/next", response_model=dict)
+
 async def trigger_next_step(
     workflow_id: int,
     background_tasks: BackgroundTasks,
-    db: Session = Depends(get_db)
+    workflow_dao: WorkflowDAO = Depends(get_workflow_dao)
 ):
     """
     Manually trigger the next step in the workflow.
@@ -114,7 +119,7 @@ async def trigger_next_step(
     POST /workflow/{id}/next
     """
     # Verify workflow exists
-    workflow = db.query(Workflow).filter(Workflow.id == workflow_id).first()
+    workflow = workflow_dao.get_by_id(workflow_id)
     if not workflow:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
@@ -149,9 +154,11 @@ async def trigger_next_step(
 
 
 @router.post("/{workflow_id}/retry", response_model=dict)
+
 async def retry_workflow(
     workflow_id: int,
     background_tasks: BackgroundTasks,
+    workflow_dao: WorkflowDAO = Depends(get_workflow_dao),
     db: Session = Depends(get_db)
 ):
     """
@@ -160,7 +167,7 @@ async def retry_workflow(
     POST /workflow/{id}/retry
     """
     # Verify workflow exists
-    workflow = db.query(Workflow).filter(Workflow.id == workflow_id).first()
+    workflow = workflow_dao.get_by_id(workflow_id)
     if not workflow:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
@@ -197,13 +204,17 @@ async def retry_workflow(
 
 
 @router.delete("/{workflow_id}", status_code=status.HTTP_204_NO_CONTENT)
-def delete_workflow(workflow_id: int, db: Session = Depends(get_db)):
+
+def delete_workflow(
+    workflow_id: int,
+    workflow_dao: WorkflowDAO = Depends(get_workflow_dao)
+):
     """
     Delete a workflow and all its history.
     
     DELETE /workflow/{id}
     """
-    workflow = db.query(Workflow).filter(Workflow.id == workflow_id).first()
+    workflow = workflow_dao.get_by_id(workflow_id)
     
     if not workflow:
         raise HTTPException(
@@ -219,8 +230,7 @@ def delete_workflow(workflow_id: int, db: Session = Depends(get_db)):
             detail="Cannot delete a running workflow"
         )
     
-    db.delete(workflow)
-    db.commit()
+    workflow_dao.delete(workflow_id)
     
     logger.info(f"Deleted workflow {workflow_id}")
     return None
