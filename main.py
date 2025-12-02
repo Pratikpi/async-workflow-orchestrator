@@ -13,18 +13,11 @@ from fastapi.middleware.cors import CORSMiddleware
 from config import settings
 from src.db import init_db
 from src.api import workflow_router, task_router, execution_router, workflow_api_router
+from src.core.logging import setup_logging
 
 
-# Configure logging
-logging.basicConfig(
-    level=getattr(logging, settings.log_level.upper()),
-    format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
-    handlers=[
-        logging.StreamHandler(),
-        logging.FileHandler("workflow_orchestrator.log"),
-    ]
-)
-
+# Initialize logging immediately for module-level logs
+# Real configuration happens in main or lifespan
 logger = logging.getLogger(__name__)
 
 
@@ -92,6 +85,17 @@ async def health_check():
 
 if __name__ == "__main__":
     import uvicorn
+    import argparse
+    
+    parser = argparse.ArgumentParser(description="Async Workflow Orchestrator")
+    parser.add_argument("--debug", action="store_true", help="Enable debug mode")
+    args = parser.parse_args()
+    
+    if args.debug:
+        setup_logging("DEBUG")
+        logger.info("Debug mode enabled via command line")
+    else:
+        setup_logging()
     
     logger.info(f"Starting server on {settings.api_host}:{settings.api_port}")
     uvicorn.run(
@@ -99,4 +103,5 @@ if __name__ == "__main__":
         host=settings.api_host,
         port=settings.api_port,
         reload=settings.api_reload,
+        log_level="debug" if args.debug else settings.log_level.lower(),
     )
