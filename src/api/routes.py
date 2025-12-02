@@ -51,24 +51,7 @@ def list_workflows(
     workflow_dao: WorkflowDAO = Depends(get_workflow_dao)
 ):
     """List all workflows with optional filtering."""
-    # Note: Basic DAO list doesn't support filtering yet. 
-    # For now, we'll list all and filter in memory or extend DAO.
-    # Given the requirement "Use DAOs everywhere", we should use DAO.
-    # Ideally DAO should support filtering. 
-    # For this iteration, let's fetch all (paginated) and filter if needed, 
-    # or better, just use the DAO's list and ignore filter if DAO doesn't support it,
-    # BUT the user wants "best place", so let's stick to what DAO provides.
-    # Actually, I should probably extend DAO list to support status filtering to be correct.
-    # But for now, let's just use list() and note the limitation or implement simple filtering in DAO.
-    # Let's assume we just use list() for now to strictly follow "Use DAO".
-    
-    # Wait, I can't just drop functionality. 
-    # I will modify DAO list to accept filters in a future step if needed, 
-    # but for now I will implement it by fetching and filtering or just fetching.
-    # Let's look at the DAO list implementation again. It takes skip/limit.
-    # I'll stick to basic list for now.
-    
-    workflows = workflow_dao.list(skip=skip, limit=limit)
+    workflows: List[Workflow] = workflow_dao.list_workflows(skip=skip, limit=limit)
     
     if status_filter:
         try:

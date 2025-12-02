@@ -17,7 +17,7 @@ class WorkflowDAO:
         """Get a workflow by its ID."""
         return self.db.query(Workflow).filter(Workflow.id == workflow_id).first()
 
-    def list(self, skip: int = 0, limit: int = 100) -> List[Workflow]:
+    def list_workflows(self, skip: int = 0, limit: int = 100) -> List[Workflow]:
         """List workflows with pagination."""
         return self.db.query(Workflow).offset(skip).limit(limit).all()
 

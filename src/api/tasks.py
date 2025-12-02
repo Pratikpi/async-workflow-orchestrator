@@ -56,7 +56,7 @@ def list_tasks(
     if workflow_id:
         tasks = task_dao.get_by_workflow_id(workflow_id)
     else:
-        tasks = task_dao.list(skip=skip, limit=limit)
+        tasks = task_dao.list_tasks(skip=skip, limit=limit)
     
     if status_filter:
         try:

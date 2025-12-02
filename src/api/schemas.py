@@ -9,14 +9,14 @@ class WorkflowCreate(BaseModel):
     """Schema for creating a new workflow."""
     name: str = Field(..., min_length=1, max_length=255)
     description: Optional[str] = None
-    config: Optional[Dict[str, Any]] = None
+    config: Optional[Any] = None
 
 
 class WorkflowUpdate(BaseModel):
     """Schema for updating a workflow."""
     name: Optional[str] = Field(None, min_length=1, max_length=255)
     description: Optional[str] = None
-    config: Optional[Dict[str, Any]] = None
+    config: Optional[Any] = None
 
 
 class WorkflowResponse(BaseModel):
@@ -25,7 +25,9 @@ class WorkflowResponse(BaseModel):
     name: str
     description: Optional[str]
     status: str
-    config: Optional[Dict[str, Any]]
+    current_state: str
+    retries: int
+    config: Optional[Any]
     created_at: datetime
     updated_at: datetime
     started_at: Optional[datetime]
@@ -42,7 +44,7 @@ class TaskCreate(BaseModel):
     name: str = Field(..., min_length=1, max_length=255)
     description: Optional[str] = None
     task_type: str = Field(..., min_length=1, max_length=100)
-    config: Optional[Dict[str, Any]] = None
+    config: Optional[Any] = None
 
 
 class TaskResponse(BaseModel):
@@ -53,8 +55,8 @@ class TaskResponse(BaseModel):
     description: Optional[str]
     status: str
     task_type: str
-    config: Optional[Dict[str, Any]]
-    result: Optional[Dict[str, Any]]
+    config: Optional[Any]
+    result: Optional[Any]
     created_at: datetime
     updated_at: datetime
     started_at: Optional[datetime]
@@ -85,7 +87,7 @@ class TransitionResponse(BaseModel):
     from_state: str
     to_state: str
     trigger: Optional[str]
-    metadata: Optional[Dict[str, Any]]
+    transition_metadata: Optional[Any]
     created_at: datetime
     
     model_config = ConfigDict(from_attributes=True)

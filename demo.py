@@ -172,7 +172,7 @@ def print_workflow_details(workflow_id: int):
         return
     
     print(f"\n{COLORS['BOLD']}Workflow Details:{COLORS['END']}")
-    print(f"  ID: {status['id']}")
+    print(f"  ID: {status['workflow_id']}")
     print(f"  Name: {status['name']}")
     print(f"  Description: {status['description']}")
     print(f"  Status: {COLORS['GREEN'] if status['status'] == 'COMPLETE' else COLORS['YELLOW']}{status['status']}{COLORS['END']}")
@@ -275,6 +275,7 @@ def list_workflows():
         print(f"\n{COLORS['BOLD']}All Workflows:{COLORS['END']}")
         for wf in workflows:
             status_color = 'GREEN' if wf['status'] == 'COMPLETE' else 'YELLOW'
+            # print(wf)
             print(f"  [{wf['id']}] {wf['name']} - {COLORS[status_color]}{wf['status']}{COLORS['END']} ({wf['current_state']})")
         
         return workflows

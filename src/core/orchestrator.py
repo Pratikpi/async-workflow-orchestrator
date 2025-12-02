@@ -374,6 +374,7 @@ class WorkflowOrchestrator:
         return {
             "workflow_id": self.workflow_id,
             "name": self.workflow.name,
+            "description": self.workflow.description,
             "status": self.workflow.status.value,
             "current_state": self.workflow.current_state,
             "retries": self.workflow.retries,

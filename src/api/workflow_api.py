@@ -86,6 +86,7 @@ def get_workflow_state(
         status_info = {
             "workflow_id": workflow_id,
             "name": workflow.name,
+            "description": workflow.description,
             "status": workflow.status.value,
             "current_state": workflow.current_state,
             "retries": workflow.retries,

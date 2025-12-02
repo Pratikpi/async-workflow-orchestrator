@@ -21,7 +21,7 @@ class TaskDAO:
         """Get all tasks for a specific workflow."""
         return self.db.query(Task).filter(Task.workflow_id == workflow_id).all()
 
-    def list(self, skip: int = 0, limit: int = 100) -> List[Task]:
+    def list_tasks(self, skip: int = 0, limit: int = 100) -> List[Task]:
         """List tasks with pagination."""
         return self.db.query(Task).offset(skip).limit(limit).all()
 
