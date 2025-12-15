@@ -69,7 +69,7 @@ class TestWorkflowDAO:
         for i in range(5):
             dao.create(Workflow(name=f"Workflow {i}", status=WorkflowStatus.INIT))
             
-        workflows = dao.list(skip=1, limit=2)
+        workflows = dao.list_workflows(skip=1, limit=2)
         assert len(workflows) == 2
         assert workflows[0].name == "Workflow 1"
 
@@ -121,7 +121,7 @@ class TestTaskDAO:
         for i in range(5):
             dao.create(Task(workflow_id=wf.id, name=f"T{i}", status=TaskStatus.PENDING, task_type="sleep"))
             
-        tasks = dao.list(limit=3)
+        tasks = dao.list_tasks(limit=3)
         assert len(tasks) == 3
 
 
