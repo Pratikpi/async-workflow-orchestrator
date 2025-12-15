@@ -35,7 +35,7 @@ async-workflow-orchestrator/
 │   ├── test_worker_manager.py     (Existing) - Worker tests
 │   └── test_api.py                 (Existing) - API tests
 ├── main.py                         (Updated) - Added workflow_api_router
-├── example.py                      (NEW) - Demonstration script
+├── demo.py                         (NEW) - Demonstration script
 ├── QUICKSTART.md                   (NEW) - Quick start guide
 └── README.md                       (Completely rewritten) - Full documentation
 ```

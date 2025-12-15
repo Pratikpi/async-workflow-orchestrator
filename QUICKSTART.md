@@ -33,10 +33,14 @@
 
 In a new terminal:
 ```bash
+# Run all demos
 python demo.py
+
+# Or run interactive mode
+python demo.py --interactive
 ```
 
-This will demonstrate automatic workflow execution with full output.
+This will demonstrate automatic workflow execution, manual control, and more.
 
 ### Option 2: Manual API Testing
 

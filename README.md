@@ -54,19 +54,32 @@ INIT → PREPARE → EXECUTE → VALIDATE → COMPLETE
    - Uses `queue.Queue` for thread-safe task queuing
    - Each workflow state maps to a specific task type
    - Tasks run in worker threads with results pushed back to orchestrator
-   - Configurable worker pool size
+1.  **Workflow Orchestrator** (`src/core/orchestrator.py`)
+    -   Implements state machine using `transitions` library
+    -   Manages workflow lifecycle: INIT → PREPARE → EXECUTE → VALIDATE → COMPLETE
+    -   Uses `asyncio` for event-driven coordination and callbacks
+    -   Tracks all state transitions in database for audit trail
+    -   Supports automatic and manual step-by-step execution
+    -   Handles retries from failed state
 
-3. **Database Layer** (`src/db/`)
-   - SQLAlchemy ORM models for workflows, tasks, and transitions
-   - Supports both PostgreSQL (production) and SQLite (development)
-   - Tracks workflow metadata, current state, retry count, and results
-   - Complete transition history for debugging and audit
+2.  **Worker Manager** (`src/core/worker_manager.py`)
+    -   Thread pool executor for parallel task execution
+    -   Uses `queue.Queue` for thread-safe task queuing
+    -   Each workflow state maps to a specific task type
+    -   Tasks run in worker threads with results pushed back to orchestrator
+    -   Configurable worker pool size
 
-4. **REST API** (`src/api/`)
-   - FastAPI-based RESTful endpoints
-   - Workflow lifecycle management (start, status, next step, retry, delete)
-   - Background task execution for non-blocking operations
-   - Input validation with Pydantic schemas
+3.  **Database Layer** (`src/db/`)
+    -   SQLAlchemy ORM models for workflows, tasks, and transitions
+    -   Supports both PostgreSQL (production) and SQLite (development)
+    -   Tracks workflow metadata, current state, retry count, and results
+    -   Complete transition history for debugging and audit
+
+4.  **REST API** (`src/api/`)
+    -   FastAPI-based RESTful endpoints
+    -   Workflow lifecycle management (start, status, next step, retry, delete)
+    -   Background task execution for non-blocking operations
+    -   Input validation with Pydantic schemas
 
 ### Hybrid Concurrency Model
 
@@ -703,8 +716,11 @@ if status['status'] == 'FAILED':
 ### Example 4: Using the Demo Script
 
 ```bash
-# Run the comprehensive example
+# Run the comprehensive example (runs all demos)
 python demo.py
+
+# Run in interactive mode
+python demo.py --interactive
 ```
 
 Output:
